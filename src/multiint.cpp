@@ -5244,6 +5244,10 @@ static void loadMapPlayerSettings(WzConfig& ini)
 		if (ini.contains("name"))
 		{
 			setPlayerName(i, ini.value("name").toWzString().toUtf8().c_str());
+			if (getHostLaunch() == HostLaunch::Skirmish && i == selectedPlayer)
+			{
+				sstrcpy(sPlayer, ini.value("name").toWzString().toUtf8().c_str());
+			}
 		}
 		else if (!NetPlay.bComms && i != selectedPlayer)
 		{
@@ -7184,7 +7188,17 @@ void WzMultiplayerOptionsTitleUI::start()
 		}
 	}
 
-	requestMapPreviewLoad(false);
+#if defined(__EMSCRIPTEN__)
+	const bool directSkirmish = getHostLaunch() == HostLaunch::Skirmish;
+#else
+	constexpr bool directSkirmish = false;
+#endif
+	// A direct launch loads the battlefield next. Starting an asynchronous preview
+	// here would occupy the resource loader needed by startMultiplayerGame().
+	if (!directSkirmish)
+	{
+		requestMapPreviewLoad(false);
+	}
 
 	const bool hostOrSingle = ingame.side == InGameSide::HOST_OR_SINGLEPLAYER;
 	/* Re-entering or entering without a challenge */
@@ -7218,11 +7232,15 @@ void WzMultiplayerOptionsTitleUI::start()
 		updateGameOptions();
 	}
 
-	if (autogame_enabled() || getHostLaunch() == HostLaunch::Autohost)
+	// Keep the direct launch human-controlled; --autogame accelerates the simulation.
+	if (autogame_enabled() || getHostLaunch() == HostLaunch::Autohost || directSkirmish)
 	{
 		if (!ingame.localJoiningInProgress)
 		{
-			startHost();
+			if (!startHost())
+			{
+				return;
+			}
 		}
 		if (!getHostLaunchStartNotReady())
 		{

@@ -1,0 +1,21 @@
+name: Lightweight checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  scripts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+      - name: Validate local build script
+        run: bash -n .github/server/build-web.sh
+      - name: Check whitespace
+        run: git diff --check HEAD^ HEAD

@@ -30,6 +30,10 @@
 #include "lib/framework/wzapp.h"
 #include "lib/framework/object_list_iteration.h"
 
+#if defined(__EMSCRIPTEN__)
+#include <emscripten.h>
+#endif
+
 #include "lib/ivis_opengl/pieblitfunc.h"
 #include "lib/ivis_opengl/piestate.h" //ivis render code
 #include "lib/ivis_opengl/piemode.h"
@@ -718,6 +722,16 @@ void wz_emscripten_did_finish_render(unsigned int browserRenderDelta)
 	if (GetGameMode() != GS_NORMAL)
 	{
 		return;
+	}
+	static bool reportedFirstGameFrame = false;
+	if (!reportedFirstGameFrame)
+	{
+		reportedFirstGameFrame = true;
+		MAIN_THREAD_EM_ASM({
+			if (typeof wz_js_skirmish_started === "function") {
+				wz_js_skirmish_started();
+			}
+		});
 	}
 	renderBudget += (lastRenderDelta + browserRenderDelta) * updateFraction.n;
 	renderBudget = std::min(renderBudget, (renderFraction * 500).floor());

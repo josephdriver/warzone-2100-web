@@ -227,7 +227,10 @@ void startTitleMenu()
 		addTextButton(FRONTEND_PLAYINTRO, FRONTEND_POS6X, FRONTEND_POS6Y, _("View Intro"), WBUT_TXTCENTRE | WBUT_DISABLE);
 		widgSetTip(psWScreen, FRONTEND_PLAYINTRO, _("Videos are missing, download them from http://wz2100.net"));
 
-		notifyAboutMissingVideos();
+		if (getHostLaunch() != HostLaunch::Skirmish)
+		{
+			notifyAboutMissingVideos();
+		}
 	}
 
 	if (findLastSave())

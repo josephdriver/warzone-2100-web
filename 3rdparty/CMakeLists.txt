@@ -107,6 +107,10 @@ add_subdirectory(optional-lite EXCLUDE_FROM_ALL)
 
 add_subdirectory(quickjs-wz EXCLUDE_FROM_ALL)
 set_property(TARGET qjs PROPERTY FOLDER "3rdparty")
+if(CMAKE_SYSTEM_NAME MATCHES "Emscripten")
+	# QuickJS still uses the legacy platform macro, removed from Emscripten 6.
+	target_compile_definitions(qjs PRIVATE EMSCRIPTEN)
+endif()
 
 
 if (WZ_ENABLE_BASIS_UNIVERSAL AND NOT WZ_CI_DISABLE_BASIS_COMPRESS_TEXTURES)
