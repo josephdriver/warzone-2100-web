@@ -4500,6 +4500,12 @@ EM_BOOL wz_emscripten_window_resized_callback(int eventType, const void *reserve
 
 bool wz_emscripten_enable_soft_fullscreen()
 {
+	// Embedded hosts size the canvas alongside their own controls. Emscripten's
+	// soft fullscreen hides sibling elements, including the host's game dock.
+	if (MAIN_THREAD_EM_ASM_INT({ return Module['wzUseHostViewport'] ? 1 : 0; }))
+	{
+		return true;
+	}
 	// Enable "soft fullscreen" - where the canvas automatically fills the window
 	debug(LOG_INFO, "Would enter soft fullscreen");
 	EmscriptenFullscreenStrategy strategy;

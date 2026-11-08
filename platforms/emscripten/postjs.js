@@ -17,7 +17,7 @@ function wzSetupPersistentConfigDir() {
 	FS.mkdir(configDirPath);
 
 	// Mount IDBFS as the file system
-	FS.mount(FS.filesystems.IDBFS, {}, configDirPath);
+	FS.mount(IDBFS, {}, configDirPath);
 
 	// Synchronize IDBFS -> Emscripten virtual filesystem
 	Module["addRunDependency"]("persistent_warzone2100_config_dir");
@@ -54,11 +54,10 @@ Module["onExit"] = function() {
 		else {
 			alert('It is now safe to close your browser window.');
 		}
+		if (typeof wz_js_handle_app_exit === "function") {
+			wz_js_handle_app_exit();
+		}
 	});
-
-	if (typeof wz_js_handle_app_exit === "function") {
-		wz_js_handle_app_exit();
-	}
 }
 
 Module['ASAN_OPTIONS'] = 'halt_on_error=0'

@@ -288,7 +288,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Emscripten")
 	target_link_options(warzone2100 PRIVATE "SHELL:-s MINIFY_HTML=0") # Disable MINIFY_HTML
 
 	# Specify properties set on incoming Module object (see shell.html, postjs.js, prejs.js)
-	target_link_options(warzone2100 PRIVATE "SHELL:-s INCOMING_MODULE_JS_API=[wasmMemory,arguments,preRun,postRun,print,printErr,canvas,setStatus,monitorRunDependencies,locateFile,onExit]")
+	target_link_options(warzone2100 PRIVATE "SHELL:-s INCOMING_MODULE_JS_API=[wasmMemory,arguments,preRun,postRun,print,printErr,canvas,setStatus,monitorRunDependencies,locateFile,onExit,onAbort,mainScriptUrlOrBlob]")
 
 	# Stack and memory usage
 	target_link_options(warzone2100 PRIVATE "SHELL:-s STACK_SIZE=10485760")
@@ -315,7 +315,12 @@ if(CMAKE_SYSTEM_NAME MATCHES "Emscripten")
 
 	target_link_options(warzone2100 PRIVATE "SHELL:--shell-file ${PROJECT_SOURCE_DIR}/platforms/emscripten/shell.html")
 	target_link_options(warzone2100 PRIVATE "SHELL:--pre-js ${PROJECT_SOURCE_DIR}/platforms/emscripten/prejs.js")
-	target_link_options(warzone2100 PRIVATE "SHELL:--post-js ${PROJECT_SOURCE_DIR}/platforms/emscripten/postjs.js")
+	# Emscripten 6 awaits main before running --post-js. Register the persistent
+	# filesystem hooks before startup so the skirmish configuration is restored first.
+	target_link_options(warzone2100 PRIVATE "SHELL:--pre-js ${PROJECT_SOURCE_DIR}/platforms/emscripten/postjs.js")
+	set_property(TARGET warzone2100 APPEND PROPERTY LINK_DEPENDS
+		"${PROJECT_SOURCE_DIR}/platforms/emscripten/prejs.js"
+		"${PROJECT_SOURCE_DIR}/platforms/emscripten/postjs.js")
 
 	# Autorevision extern-postjs
 	add_dependencies(warzone2100 autorevision autorevision_externpostjs)
