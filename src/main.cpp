@@ -1748,6 +1748,7 @@ void osSpecificPostInit_Win()
 
 #if defined(__EMSCRIPTEN__)
 # include "emscripten_helpers.h"
+# include <emscripten.h>
 #endif
 
 void osSpecificFirstChanceProcessSetup()
@@ -2267,6 +2268,13 @@ int realmain(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+#if defined(__EMSCRIPTEN__)
+	const int hostRenderScale = EM_ASM_INT({ return Module['wzHostRenderScalePercent'] || 0; });
+	if (hostRenderScale > 0)
+	{
+		war_setRenderResolutionPercent(hostRenderScale);
+	}
+#endif
 	// 0 selects dynamic resolution, which keeps the scene targets at native size
 	// and is driven per frame by the dynamic resolution controller
 	if (war_getRenderResolutionPercent() != 100 && war_getRenderResolutionPercent() != 0)

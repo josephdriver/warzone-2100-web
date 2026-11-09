@@ -716,6 +716,16 @@ const Rational renderFraction(2, 5);  // Minimum fraction of time spent renderin
 const Rational updateFraction = Rational(1) - renderFraction;
 
 #if defined(__EMSCRIPTEN__)
+extern "C" EMSCRIPTEN_KEEPALIVE void wz_set_host_render_scale(int percent)
+{
+	percent = std::clamp(percent, 10, 100);
+	if (war_getRenderResolutionPercent() == static_cast<uint32_t>(percent)) return;
+	if (gfx_api::context::get().setSceneRenderScale(percent))
+	{
+		war_setRenderResolutionPercent(percent);
+	}
+}
+
 unsigned lastRenderDelta = 0;
 void wz_emscripten_did_finish_render(unsigned int browserRenderDelta)
 {
@@ -853,6 +863,29 @@ GAMECODE gameLoop()
 
 #if defined(__EMSCRIPTEN__)
 	lastRenderDelta = (after - before);
+	static const bool benchmarkFrames = MAIN_THREAD_EM_ASM_INT({ return typeof Module['wzBenchmarkFrame'] === 'function'; });
+	if (benchmarkFrames)
+	{
+		MAIN_THREAD_EM_ASM({ Module['wzBenchmarkFrame']($0); }, after - before);
+		const auto& droids = gameWorld.objects.droids[selectedPlayer];
+		if (!droids.empty())
+		{
+			const auto visible = std::find_if(droids.begin(), droids.end(), [](const auto* unit){
+				return unit->sDisplay.screenR > 0 && unit->sDisplay.screenX > 40 && unit->sDisplay.screenY > 40
+					&& unit->sDisplay.screenX < pie_GetVideoBufferWidth() - 40 && unit->sDisplay.screenY < pie_GetVideoBufferHeight() - 140;
+			});
+			const auto* droid = visible != droids.end() ? *visible : droids.front();
+			const auto selected = std::count_if(droids.begin(), droids.end(), [](const auto* unit){ return unit->selected; });
+			const auto drawable = gfx_api::context::get().getDrawableDimensions();
+			MAIN_THREAD_EM_ASM({
+				let output = document.getElementById('game-input-state');
+				if (!output) {
+					output = document.createElement('script'); output.type = 'application/json'; output.id = 'game-input-state'; document.body.append(output);
+				}
+				output.textContent = JSON.stringify({x:$0, y:$1, radius:$2, selected:$3, units:$4, mouseX:$5, mouseY:$6, tileX:$7, tileY:$8, width:$9, height:$10, drawableWidth:$11, drawableHeight:$12});
+			}, droid->sDisplay.screenX, droid->sDisplay.screenY, droid->sDisplay.screenR, selected, droids.size(), mouseX(), mouseY(), mouseTileX, mouseTileY, pie_GetVideoBufferWidth(), pie_GetVideoBufferHeight(), drawable.first, drawable.second);
+		}
+	}
 #else
 	renderBudget += (after - before) * updateFraction.n;
 	renderBudget = std::min(renderBudget, (renderFraction * 500).floor());
