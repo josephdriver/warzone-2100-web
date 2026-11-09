@@ -4284,7 +4284,7 @@ void wzEventLoopOneFrame(void* arg)
 #if defined(__EMSCRIPTEN__)
 	if (lastLoopReturn > 0)
 	{
-		wz_emscripten_did_finish_render(lastLoopReturn - wzGetTicks());
+		wz_emscripten_did_finish_render(wzGetTicks() - lastLoopReturn);
 	}
 #endif
 
@@ -4498,12 +4498,34 @@ EM_BOOL wz_emscripten_window_resized_callback(int eventType, const void *reserve
 	return EMSCRIPTEN_RESULT_SUCCESS;
 }
 
+extern "C" EMSCRIPTEN_KEEPALIVE void wz_resize_host_viewport()
+{
+	double width = 0, height = 0;
+	emscripten_get_element_css_size("#canvas", &width, &height);
+	if (width <= 0 || height <= 0)
+	{
+		return;
+	}
+	wzAsyncExecOnMainThread([width, height]{
+		SDL_SetWindowSize(WZwindow, static_cast<int>(std::round(width)), static_cast<int>(std::round(height)));
+	});
+}
+
 bool wz_emscripten_enable_soft_fullscreen()
 {
 	// Embedded hosts size the canvas alongside their own controls. Emscripten's
 	// soft fullscreen hides sibling elements, including the host's game dock.
 	if (MAIN_THREAD_EM_ASM_INT({ return Module['wzUseHostViewport'] ? 1 : 0; }))
 	{
+		MAIN_THREAD_EM_ASM({
+			if (!Module['wzHostResizeObserver']) {
+				const resize = () => Module['_wz_resize_host_viewport']();
+				Module['wzHostResizeObserver'] = new ResizeObserver(resize);
+				Module['wzHostResizeObserver'].observe(Module['canvas']);
+				window.addEventListener('resize', resize);
+			}
+		});
+		wz_resize_host_viewport();
 		return true;
 	}
 	// Enable "soft fullscreen" - where the canvas automatically fills the window

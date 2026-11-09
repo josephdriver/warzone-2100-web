@@ -53,6 +53,24 @@ The Web Edition also ships with textures that have been optimized for size, at t
 
 > If you want the highest quality textures, and the complete set of features, you should consider downloading the latest [native build for your system](https://github.com/Warzone2100/warzone2100/releases/latest).
 
+## Embedded hosts
+
+Battlewire sets `Module.wzUseHostViewport` to let the host size the canvas around
+its controls. A resize observer updates the SDL window and renderer when the
+canvas changes size, including fullscreen transitions. The host must suppress
+the canvas context menu, as the standalone shell does.
+
+`Module.wzHostRenderScalePercent` sets the initial 3D scene render percentage.
+The exported `_wz_set_host_render_scale(percent)` changes it while running;
+the interface stays at the drawable resolution. Battlewire's Auto choice targets
+CSS pixel density with a roughly 1920 × 1080 scene budget, Performance uses 75%
+of that linear scale, and High uses the full drawable resolution.
+
+An optional `Module.wzBenchmarkFrame(cpuMs)` receives each completed game render's
+CPU duration. It does not measure GPU completion. Battlewire enables sampling
+only with `?benchmark=1`, warms up for five seconds, and records ten seconds.
+The results stay in the page and browser console.
+
 ## Persisting Data:
 
 The Web Edition can persist Warzone 2100 settings, configuration, savegames and more in your browser storage using technologies such as IndexedDB.
