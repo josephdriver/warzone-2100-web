@@ -4506,9 +4506,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE void wz_resize_host_viewport()
 	{
 		return;
 	}
-	wzAsyncExecOnMainThread([width, height]{
-		SDL_SetWindowSize(WZwindow, static_cast<int>(std::round(width)), static_cast<int>(std::round(height)));
-	});
+	// SDL_SetWindowSize alone does not reliably emit a resize event in the web
+	// backend. Update the game's logical dimensions and queue the drawable resize
+	// through the same path as Emscripten soft fullscreen.
+	wz_emscripten_window_resized_callback(0, nullptr, nullptr);
 }
 
 bool wz_emscripten_enable_soft_fullscreen()
