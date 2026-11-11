@@ -45,7 +45,32 @@ if (!Module['preRun'])
 }
 Module['preRun'].push(wzSetupPersistentConfigDir);
 
+let wzHostReturnSyncing = false;
+Module.wzFinishHostReturn = function() {
+	if (wzHostReturnSyncing) return;
+	wzHostReturnSyncing = true;
+	wzSaveConfigDirToPersistentStore((error) => {
+		wzHostReturnSyncing = false;
+		if (error) {
+			if (typeof wz_js_handle_app_exit === "function") {
+				wz_js_handle_app_exit('Local data could not be saved. Retry Return to Battlewire.');
+			}
+			return;
+		}
+		Module.wzHostReturnSynced = true;
+		try {
+			Module._wz_finish_host_return();
+		} catch (error) {
+			if (!(error instanceof ExitStatus) || error.status !== 0) throw error;
+		}
+	});
+};
+
 Module["onExit"] = function() {
+	if (Module.wzHostReturnSynced) {
+		if (typeof wz_js_handle_app_exit === "function") wz_js_handle_app_exit();
+		return;
+	}
 	// Sync IDBFS
 	wzSaveConfigDirToPersistentStore(() => {
 		if (typeof wz_js_display_loading_indicator === "function") {
