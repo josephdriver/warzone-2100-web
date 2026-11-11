@@ -882,8 +882,8 @@ GAMECODE gameLoop()
 				if (!output) {
 					output = document.createElement('script'); output.type = 'application/json'; output.id = 'game-input-state'; document.body.append(output);
 				}
-				output.textContent = JSON.stringify({x:$0, y:$1, radius:$2, selected:$3, units:$4, mouseX:$5, mouseY:$6, tileX:$7, tileY:$8, width:$9, height:$10, drawableWidth:$11, drawableHeight:$12});
-			}, droid->sDisplay.screenX, droid->sDisplay.screenY, droid->sDisplay.screenR, selected, droids.size(), mouseX(), mouseY(), mouseTileX, mouseTileY, pie_GetVideoBufferWidth(), pie_GetVideoBufferHeight(), drawable.first, drawable.second);
+				output.textContent = JSON.stringify({x:$0, y:$1, radius:$2, selected:$3, units:$4, mouseX:$5, mouseY:$6, tileX:$7, tileY:$8, width:$9, height:$10, drawableWidth:$11, drawableHeight:$12, viewX:$13, viewZ:$14});
+			}, droid->sDisplay.screenX, droid->sDisplay.screenY, droid->sDisplay.screenR, selected, droids.size(), mouseX(), mouseY(), mouseTileX, mouseTileY, pie_GetVideoBufferWidth(), pie_GetVideoBufferHeight(), drawable.first, drawable.second, playerPos.p.x, playerPos.p.z);
 		}
 	}
 #else

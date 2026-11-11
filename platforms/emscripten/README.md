@@ -101,3 +101,27 @@ The Web Edition can automatically stream campaign video sequences on-demand (alb
 > **It is strongly recommended you play with an active Internet connection** so these videos can be streamed during gameplay.
 
 If you have a spotty Internet connection, you should strongly consider the native builds instead, which include the campaign videos for offline viewing.
+
+
+## Battlewire host input and return
+
+Battlewire's version 1 input adapter feeds the existing SDL pointer event path.
+While pointer lock is active, the host supplies bounded movement deltas and
+mirrors the engine's current CSS cursor. `Module.wzHostPointer` supplies normalized
+`x`/`y` coordinates and an increasing `revision` for host input. The SDL backend
+uses that absolute position for mouse events and reprojects it after a viewport
+resize, keeping hit testing aligned with the visible cursor. Without that
+optional state, ordinary SDL/native input behavior is unchanged. Battlewire consumes Enter before SDL
+for its chat overlay and releases held input before suspending gameplay input.
+Shared behavior is defined in the Battlewire checkout's
+`docs/web-port-architecture.md`.
+
+`Module._wz_request_host_return()` queues the native SDL quit event and returns
+whether SDL accepted it. Hosts must wait for `wz_js_handle_app_exit`, which runs
+after native shutdown and the final persistent-storage sync, before navigating.
+The host-return path keeps IDBFS alive until that sync completes, then exits the
+runtime. A sync failure calls `wz_js_handle_app_exit(error)` and retains the
+filesystem for another `_wz_request_host_return()` attempt; the host must keep
+the page open and offer retry.
+Deploy the matching engine before enabling menu Return in Battlewire; older
+engines do not expose this hook.

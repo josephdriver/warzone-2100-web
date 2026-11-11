@@ -2239,6 +2239,51 @@ void inputSetMouseButton(MOUSE_KEY_CODE mouseKeyCode, bool pressed, Vector2i log
 	}
 }
 
+#if defined(__EMSCRIPTEN__)
+static int readHostPointer(Vector2i &position)
+{
+	return MAIN_THREAD_EM_ASM_INT({
+		const point = Module.wzHostPointer;
+		if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return 0;
+		HEAP32[$0 >> 2] = Math.max(0, Math.min($2 - 1, Math.floor(point.x * $2)));
+		HEAP32[$1 >> 2] = Math.max(0, Math.min($3 - 1, Math.floor(point.y * $3)));
+		return point.revision;
+	}, &position.x, &position.y, screenWidth, screenHeight);
+}
+
+static bool SDLCALL filterHostMouseEvent(void *, SDL_Event *event)
+{
+	const bool motion = event->type == SDL_EVENT_MOUSE_MOTION;
+	const bool button = event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP;
+	if ((!motion && !button) || !SDL_IsMainThread())
+	{
+		return true;
+	}
+	if ((motion ? event->motion.which : event->button.which) == SDL_TOUCH_MOUSEID)
+	{
+		return true;
+	}
+	Vector2i position;
+	// Each queued event keeps the cursor position from when the browser sent it.
+	if (readHostPointer(position))
+	{
+		const float x = position.x * current_displayScaleFactor;
+		const float y = position.y * current_displayScaleFactor;
+		if (motion)
+		{
+			event->motion.x = x;
+			event->motion.y = y;
+		}
+		else
+		{
+			event->button.x = x;
+			event->button.y = y;
+		}
+	}
+	return true;
+}
+#endif
+
 /*!
  * Handle mouse button events (We can handle up to 5)
  */
@@ -4275,6 +4320,27 @@ static void handleActiveEvent(SDL_Event *event)
 
 static SDL_Event event;
 #if defined(__EMSCRIPTEN__)
+static bool hostReturnRequested = false;
+static bool hostShutdownComplete = false;
+
+extern "C" EMSCRIPTEN_KEEPALIVE bool wz_request_host_return()
+{
+	if (hostShutdownComplete)
+	{
+		EM_ASM({ Module.wzFinishHostReturn(); });
+		return true;
+	}
+	SDL_Event quitEvent{};
+	quitEvent.type = SDL_EVENT_QUIT;
+	hostReturnRequested = SDL_PushEvent(&quitEvent);
+	return hostReturnRequested;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void wz_finish_host_return()
+{
+	emscripten_force_exit(0);
+}
+
 std::function<void()> saved_onShutdown;
 unsigned lastLoopReturn = 0;
 #endif
@@ -4338,6 +4404,12 @@ void wzEventLoopOneFrame(void* arg)
 			// Exit "soft fullscreen" - (as long as we aren't in "real" fullscreen mode)
 			emscripten_exit_soft_fullscreen();
 
+			if (hostReturnRequested)
+			{
+				// Keep IDBFS open until the final asynchronous save has completed.
+				emscripten_runtime_keepalive_push();
+			}
+
 			// Actually trigger cleanup code
 			if (saved_onShutdown)
 			{
@@ -4347,6 +4419,11 @@ void wzEventLoopOneFrame(void* arg)
 
 			// Stop Emscripten from calling the main loop
 			emscripten_cancel_main_loop();
+			if (hostReturnRequested)
+			{
+				hostShutdownComplete = true;
+				EM_ASM({ Module.wzFinishHostReturn(); });
+			}
 #else
 			ASSERT(arg != nullptr, "No valid bContinue");
 			if (arg)
@@ -4371,6 +4448,20 @@ void wzEventLoopOneFrame(void* arg)
 	}
 
 	processScreenSizeChangeNotificationIfNeeded();
+#if defined(__EMSCRIPTEN__)
+	static int lastHostPointerRevision = 0;
+	static unsigned int lastHostPointerWidth = 0, lastHostPointerHeight = 0;
+	Vector2i hostPointer;
+	const int revision = readHostPointer(hostPointer);
+	if (revision && (revision != lastHostPointerRevision || screenWidth != lastHostPointerWidth || screenHeight != lastHostPointerHeight))
+	{
+		// Reproject after a resize even when the locked mouse has not moved.
+		inputSetMousePos(hostPointer.x, hostPointer.y);
+		lastHostPointerRevision = revision;
+		lastHostPointerWidth = screenWidth;
+		lastHostPointerHeight = screenHeight;
+	}
+#endif
 	wzGamepadUpdate();			// poll gamepad axis state
 	mainLoop();				// WZ does its thing
 	inputNewFrame();			// reset input states
@@ -4388,6 +4479,10 @@ void wzMainEventLoop(std::function<void()> onShutdown)
 
 #if defined(__EMSCRIPTEN__)
 	saved_onShutdown = onShutdown;
+	if (EM_ASM_INT({ return Module.wzUseHostViewport === true; }))
+	{
+		SDL_SetEventFilter(filterHostMouseEvent, nullptr);
+	}
 	// Receives a function to call and some user data to provide it.
 	emscripten_set_main_loop_arg(wzEventLoopOneFrame, nullptr, -1, true);
 #else
